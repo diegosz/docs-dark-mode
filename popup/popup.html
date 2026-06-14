@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="popup.css" />
+    <title>Dark Mode for Google Docs</title>
+  </head>
+  <body>
+    <header class="header">
+      <img class="logo" src="../icons/icon48.png" alt="" width="28" height="28" />
+      <h1 class="title">Dark Mode · Docs, Sheets &amp; Slides</h1>
+    </header>
+
+    <label class="row toggle-row" for="enabled">
+      <span class="row-label">Dark mode</span>
+      <span class="switch">
+        <input type="checkbox" id="enabled" />
+        <span class="slider" aria-hidden="true"></span>
+      </span>
+    </label>
+
+    <fieldset class="row mode-row" id="mode-row">
+      <legend class="row-label">Page style</legend>
+      <div class="segmented" role="radiogroup">
+        <label class="seg">
+          <input type="radio" name="mode" value="colorful" />
+          <span>Colorful</span>
+        </label>
+        <label class="seg">
+          <input type="radio" name="mode" value="grayscale" />
+          <span>Grayscale</span>
+        </label>
+      </div>
+    </fieldset>
+
+    <p class="hint">
+      In Docs &amp; Sheets the page is a canvas, so images, cell colors and charts
+      invert with it — <strong>Grayscale</strong> softens that. In Slides only the
+      editor is darkened; your slides keep their colors. Changes apply instantly.
+    </p>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,414 @@
+/* ============================================================
+   Dark Mode for Google Docs
+   ------------------------------------------------------------
+   Every rule is gated behind `html.dde-enabled`, which content.js
+   adds to <html> based on the saved toggle. When the extension is
+   OFF the class is absent, so all of these rules are inert and the
+   page renders exactly as Google ships it.
+
+   Two layers, because Google Docs is two different things:
+     1. The editor CHROME (toolbar, menus, comment sidebar, ...) is
+        ordinary HTML/DOM, so we restyle it with normal CSS.
+     2. The document PAGE is painted onto a <canvas> (since 2021).
+        Text and images are pixels, not DOM nodes, so the only way
+        to darken it is a coarse `filter` over the canvas. That also
+        inverts embedded images — unavoidable on Chromium. Use the
+        grayscale mode to make that less jarring.
+   ============================================================ */
+
+html.dde-enabled {
+  --dde-bg:        #202124; /* app background + page margins        */
+  --dde-surface:   #2a2b2d; /* toolbars, menus, panels, sidebar     */
+  --dde-surface-2: #3c4043; /* hover / raised / borders             */
+  --dde-border:    #444649;
+  --dde-text:      #e8eaed;
+  --dde-text-dim:  #bdc1c6;
+  --dde-accent:    #8ab4f8;
+
+  /* Paper "darkness": how far the canvas is inverted. 0.9 lands the
+     white page around #1b1b1b and black text around #e8e8e8 — softer
+     than a pure invert(1) so it is easier on the eyes. */
+  --dde-invert: 0.9;
+}
+
+/* ============================================================
+   1. APP SHELL / BACKGROUNDS  (real DOM)
+   ============================================================ */
+html.dde-enabled,
+html.dde-enabled body,
+html.dde-enabled .docs-gm,
+html.dde-enabled #docs-editor-container,
+html.dde-enabled #docs-editor,
+html.dde-enabled .kix-appview-editor,
+html.dde-enabled .kix-appview {
+  background-color: var(--dde-bg) !important;
+}
+
+/* ============================================================
+   2. THE DOCUMENT PAGE  (canvas — filter only)
+   ============================================================ */
+/* The painted document tiles. invert + hue-rotate keeps colours
+   roughly true (blue stays blue); see grayscale override below. */
+html.dde-enabled .kix-canvas-tile-content {
+  filter: invert(var(--dde-invert)) hue-rotate(180deg);
+}
+html.dde-enabled.dde-mode-grayscale .kix-canvas-tile-content {
+  filter: invert(var(--dde-invert)) grayscale(1);
+}
+
+/* The paper box behind the canvas + its drop shadow, so any padding
+   or sub-pixel gaps match the inverted page instead of flashing white. */
+html.dde-enabled .kix-page-paginated,
+html.dde-enabled .kix-page-compact,
+html.dde-enabled .kix-page,
+html.dde-enabled .kix-rotatingtilemanager-content {
+  background-color: #1b1b1b !important;
+}
+html.dde-enabled .kix-page-paginated,
+html.dde-enabled .kix-page-compact-box-shadow {
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Ruler — invert it so the white strip goes dark and the dark margin markers
+   and numbers become light. */
+html.dde-enabled .kix-ruler-container,
+html.dde-enabled .docs-ruler {
+  filter: invert(var(--dde-invert)) hue-rotate(180deg);
+}
+
+/* ============================================================
+   3. TITLE BAR / BRANDING  (real DOM)
+   ============================================================ */
+html.dde-enabled #docs-chrome,
+html.dde-enabled #docs-header,
+html.dde-enabled #docs-branding-container,
+html.dde-enabled #docs-titlebar-container,
+html.dde-enabled .docs-title-outer,
+html.dde-enabled #docs-titlebar-buttons,
+html.dde-enabled .docs-titlebar-buttons {
+  background-color: var(--dde-bg) !important;
+}
+html.dde-enabled .docs-title-input,
+html.dde-enabled .docs-title-input-label-inner {
+  color: var(--dde-text) !important;
+}
+
+/* ============================================================
+   4. MENU BAR + TOOLBAR  (real DOM)
+   ============================================================ */
+html.dde-enabled #docs-menubars,
+html.dde-enabled .docs-menubar,
+html.dde-enabled #docs-toolbar-wrapper,
+html.dde-enabled #docs-bars,
+html.dde-enabled #docs-toolbar,
+html.dde-enabled .docs-toolbar,
+html.dde-enabled .goog-toolbar {
+  background-color: var(--dde-bg) !important;
+  border-color: var(--dde-border) !important;
+}
+
+/* Menu + button text */
+html.dde-enabled .menu-button,
+html.dde-enabled .goog-toolbar-button,
+html.dde-enabled .goog-toolbar-menu-button,
+html.dde-enabled .docs-menu-button-caption,
+html.dde-enabled .goog-toolbar-combo-button-input,
+html.dde-enabled .goog-control {
+  color: var(--dde-text) !important;
+}
+
+/* Toolbar icons are dark glyphs on a light sprite — invert so they
+   read on a dark bar. (Colour icons get tinted; acceptable trade-off.) */
+html.dde-enabled .docs-icon-img-container,
+html.dde-enabled .docs-icon-img,
+html.dde-enabled .docs-icon .docs-icon-img {
+  filter: invert(var(--dde-invert)) hue-rotate(180deg);
+}
+
+/* Hover / active feedback */
+html.dde-enabled .goog-toolbar-button-hover,
+html.dde-enabled .goog-toolbar-menu-button-hover,
+html.dde-enabled .goog-toolbar-button-active,
+html.dde-enabled .menu-button-hover,
+html.dde-enabled .menu-button-open {
+  background-color: var(--dde-surface-2) !important;
+  border-color: var(--dde-border) !important;
+}
+
+/* Toolbar controls (buttons, toggles, zoom/style/font dropdowns) ship their own
+   light background — drop it so they sit flat on the dark bar, text stays light. */
+html.dde-enabled .goog-toolbar-button,
+html.dde-enabled .goog-toolbar-toggle-button,
+html.dde-enabled .goog-toolbar-combo-button,
+html.dde-enabled .goog-toolbar-menu-button,
+html.dde-enabled .goog-toolbar-select,
+html.dde-enabled .docs-toolbar-zoom-combobox {
+  background-color: transparent !important;
+  color: var(--dde-text) !important;
+}
+
+/* The "Menus" omnibox search pill in the toolbar. */
+html.dde-enabled .docs-omnibox-input {
+  background-color: var(--dde-surface) !important;
+  color: var(--dde-text) !important;
+}
+
+/* White ring drawn behind each collaborator avatar in the title bar. */
+html.dde-enabled .docs-presence-plus-collab-widget-color-block {
+  background-color: transparent !important;
+}
+
+/* ============================================================
+   5. POP-UP MENUS, DIALOGS, COMBO BOXES  (real DOM, appended to body)
+   ============================================================ */
+html.dde-enabled .goog-menu,
+html.dde-enabled .goog-menuitem,
+html.dde-enabled .docs-material-menu,
+html.dde-enabled .goog-combobox,
+html.dde-enabled .goog-combobox-menu,
+html.dde-enabled .modal-dialog,
+html.dde-enabled #docs-instant-bubble,
+html.dde-enabled .docs-bubble {
+  background-color: var(--dde-surface) !important;
+  color: var(--dde-text) !important;
+  border-color: var(--dde-border) !important;
+}
+html.dde-enabled .goog-menuitem-content,
+html.dde-enabled .goog-menuitem-accel,
+html.dde-enabled .modal-dialog-title-text,
+html.dde-enabled .modal-dialog-content {
+  color: var(--dde-text) !important;
+}
+html.dde-enabled .goog-menuitem-highlight,
+html.dde-enabled .goog-menuitem-hover {
+  background-color: var(--dde-surface-2) !important;
+  border-color: var(--dde-surface-2) !important;
+}
+
+/* Disabled menu items: Google dims them to rgba(31,31,31,0.38) — a dark colour
+   that vanishes on a dark menu. Use a readable muted gray so they still read as
+   "disabled" but are visible. */
+html.dde-enabled .goog-menuitem-disabled,
+html.dde-enabled .goog-menuitem-disabled .goog-menuitem-content,
+html.dde-enabled .goog-menuitem-disabled .goog-menuitem-label,
+html.dde-enabled .goog-menuitem-disabled .goog-menuitem-accel {
+  color: #80868b !important;
+}
+/* Enabled menu-item label (some menus put the text here, not in -content). */
+html.dde-enabled .goog-menuitem-label {
+  color: var(--dde-text) !important;
+}
+
+/* The access-level ("Solo ver" / "Only view") bubble: its container is themed
+   via .goog-menu, but its text/button labels are hard-set to a dark colour. */
+html.dde-enabled .docs-access-level-indicator-menu-text,
+html.dde-enabled .docs-access-level-indicator-menu .docs-material-button-content {
+  color: var(--dde-text) !important;
+}
+
+/* ============================================================
+   6. COMMENTS SIDEBAR  (real DOM — .docos-* namespace)
+   ============================================================ */
+html.dde-enabled .docos-stream-view,
+html.dde-enabled .docos-docoview-rootreply,
+html.dde-enabled .docos-anchoreddocoview,
+html.dde-enabled .docos-anchoredreplyview,
+html.dde-enabled .docos-anchoredreplyview-header,
+html.dde-enabled .docos-replyview {
+  background-color: var(--dde-surface) !important;
+  border-color: var(--dde-border) !important;
+}
+html.dde-enabled .docos-anchoredreplyview-author,
+html.dde-enabled .docos-replyview-comment,
+html.dde-enabled .docos-replyview-static-content,
+html.dde-enabled .docos-replyview-timestamp {
+  color: var(--dde-text) !important;
+}
+html.dde-enabled .docos-replyview-timestamp {
+  color: var(--dde-text-dim) !important;
+}
+
+/* ============================================================
+   7. LEFT NAVIGATION PANEL  (document tabs + outline — real DOM)
+   ============================================================ */
+/* Panel surfaces */
+html.dde-enabled .left-sidebar-container,
+html.dde-enabled .left-sidebar-container-content,
+html.dde-enabled .left-sidebar-resizer-drag-handle,
+html.dde-enabled .navigation-widget,
+html.dde-enabled .navigation-widget-content,
+html.dde-enabled .navigation-widget-hat,
+html.dde-enabled .outlines-widget,
+html.dde-enabled .outlines-widget-chaptered,
+html.dde-enabled .kix-outlines-widget-header-container,
+html.dde-enabled .kix-outlines-widget-header-contents,
+html.dde-enabled .navigation-item-list {
+  background-color: var(--dde-bg) !important;
+}
+
+/* Panel text: header + each tab/outline row label. The visible label sits on
+   .navigation-item-content (and .navigation-item-title for the active row) —
+   Google paints these a dim gray, so force them bright. */
+html.dde-enabled .navigation-widget,
+html.dde-enabled .navigation-widget-content,
+html.dde-enabled .navigation-widget-header,
+html.dde-enabled .kix-outlines-widget-header-text-chaptered,
+html.dde-enabled .kix-outlines-widget-header-text-unchaptered,
+html.dde-enabled .navigation-item,
+html.dde-enabled .navigation-item-content-container,
+html.dde-enabled .navigation-item-content,
+html.dde-enabled .navigation-item-title {
+  color: var(--dde-text) !important;
+}
+
+/* The "no headings yet" placeholder stays intentionally quiet. */
+html.dde-enabled .navigation-widget-empty-content {
+  color: var(--dde-text-dim) !important;
+}
+
+/* Current-location / selected row + hover: white label on a clear highlight. */
+html.dde-enabled .navigation-item.location-indicator-highlight,
+html.dde-enabled .navigation-item:hover {
+  background-color: var(--dde-surface-2) !important;
+}
+
+/* The active row's left bar is the "you are here" cue — make it the accent. */
+html.dde-enabled .location-indicator-highlight .navigation-item-vertical-line,
+html.dde-enabled .location-indicator-highlight .navigation-item-vertical-line-top,
+html.dde-enabled .location-indicator-highlight .navigation-item-vertical-line-middle,
+html.dde-enabled .location-indicator-highlight .navigation-item-vertical-line-bottom {
+  background-color: var(--dde-accent) !important;
+}
+
+/* Document-tab labels (the multi-tab tree). Google dims non-active tab labels to
+   #444746 (low contrast on dark). Lighten every tab label, and darken the
+   selected tab's light-blue pill to an accent tint so its now-light label reads. */
+html.dde-enabled .chapter-label-content {
+  color: var(--dde-text) !important;
+}
+html.dde-enabled .chapter-item-label-and-buttons-container-selected {
+  background-color: rgba(138, 180, 248, 0.24) !important;
+}
+
+/* Indent guide lines + header divider */
+html.dde-enabled .navigation-item-vertical-line,
+html.dde-enabled .navigation-item-vertical-line-top,
+html.dde-enabled .navigation-item-vertical-line-middle,
+html.dde-enabled .navigation-item-vertical-line-bottom {
+  background-color: var(--dde-surface-2) !important;
+}
+html.dde-enabled .kix-outlines-widget-header-shadow {
+  background-color: var(--dde-border) !important;
+}
+
+/* The collapse/back arrow in the panel header is a dark glyph — invert it. */
+html.dde-enabled .navigation-widget-hat-close-button-inner-box {
+  filter: invert(var(--dde-invert)) hue-rotate(180deg);
+}
+
+/* ============================================================
+   8. SCROLLBARS
+   ============================================================ */
+html.dde-enabled ::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+  background: var(--dde-bg);
+}
+html.dde-enabled ::-webkit-scrollbar-thumb {
+  background: #5f6368;
+  border: 3px solid var(--dde-bg);
+  border-radius: 8px;
+}
+html.dde-enabled ::-webkit-scrollbar-thumb:hover {
+  background: #7a7d80;
+}
+
+/* ============================================================
+   9. GOOGLE SHEETS  (the "waffle" app — different selectors)
+   ------------------------------------------------------------
+   The title bar and toolbar reuse the shared #docs-chrome /
+   .goog-toolbar-* rules above. Below are the Sheets-only pieces:
+   the grid (canvas), the row/column header backgrounds, the
+   formula bar, and the bottom sheet-tabs bar.
+   ============================================================ */
+
+/* The grid is painted on a <canvas> — same constraint as Docs: invert it.
+   Cell fills, charts and conditional formatting invert too (unavoidable). */
+html.dde-enabled .grid-container canvas {
+  filter: invert(var(--dde-invert)) hue-rotate(180deg);
+}
+html.dde-enabled.dde-mode-grayscale .grid-container canvas {
+  filter: invert(var(--dde-invert)) grayscale(1);
+}
+
+/* Backgrounds behind/around the grid + the row/column header gutters. */
+html.dde-enabled .grid-container,
+html.dde-enabled #waffle-grid-container,
+html.dde-enabled .row-headers-background,
+html.dde-enabled .column-headers-background,
+html.dde-enabled .grid-shim-bottom {
+  background-color: #1b1b1b !important;
+}
+
+/* Formula bar + name box (the row showing the cell ref and its contents). */
+html.dde-enabled #formula-bar-name-box-wrapper,
+html.dde-enabled .waffle-name-box-container,
+html.dde-enabled .waffle-name-box,
+html.dde-enabled #formula-bar,
+html.dde-enabled .formula-bar,
+html.dde-enabled .cell-input {
+  background-color: var(--dde-surface) !important;
+  color: var(--dde-text) !important;
+  border-color: var(--dde-border) !important;
+}
+
+/* Bottom bar with the sheet tabs. */
+html.dde-enabled .grid-bottom-bar,
+html.dde-enabled .docs-sheet-tab {
+  background-color: var(--dde-bg) !important;
+  border-color: var(--dde-border) !important;
+}
+html.dde-enabled .docs-sheet-tab,
+html.dde-enabled .docs-sheet-tab-name {
+  color: var(--dde-text) !important;
+}
+html.dde-enabled .docs-sheet-active-tab {
+  background-color: var(--dde-surface-2) !important;
+}
+
+/* Active toolbar toggle (Bold/Italic on, etc.) — accent tint instead of light blue. */
+html.dde-enabled .goog-toolbar-button-checked {
+  background-color: rgba(138, 180, 248, 0.24) !important;
+}
+
+/* ============================================================
+   10. GOOGLE SLIDES  (the "punch" app — SVG-rendered slides)
+   ------------------------------------------------------------
+   A slide is a DESIGN artifact: its colors, background and images
+   are what the audience sees, and the slide is SVG (so inverting
+   would also wreck embedded images). So we DON'T touch the slide
+   itself — we darken only the editor chrome around it: the
+   filmstrip, the workspace backdrop, and the speaker-notes pane.
+   The white slide then sits as a bright rectangle on a dark
+   workspace (like Figma/PowerPoint dark mode). Title bar + toolbar
+   reuse the shared #docs-chrome / .goog-toolbar-* rules above.
+   ============================================================ */
+html.dde-enabled .filmstrip,
+html.dde-enabled #filmstrip-controls,
+html.dde-enabled .workspace-container,
+html.dde-enabled #speakernotes-dragger {
+  background-color: var(--dde-bg) !important;
+}
+
+/* Speaker-notes pane (editable text). */
+html.dde-enabled #speakernotes,
+html.dde-enabled #speakernotes-workspace {
+  background-color: var(--dde-surface) !important;
+  color: var(--dde-text) !important;
+}
+
+/* Secondary/description line in rich menu items (e.g. "Presenter view" in the
+   slideshow menu) — Google colours it dark gray, dim on a dark menu. */
+html.dde-enabled .punch-qanda-presenter-view-menu-item-description {
+  color: var(--dde-text-dim) !important;
+}

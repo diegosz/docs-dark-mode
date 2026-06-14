@@ -1,0 +1,98 @@
+name: Release
+
+# On a version tag: build the zip, sign a checksums file with KEYLESS cosign
+# (Sigstore Fulcio + Rekor — no keys to provision), publish a GitHub Release with
+# the signed artifacts, then push the update to the Chrome Web Store.
+#
+#   (edit manifest.json "version" -> 1.0.1)
+#   git commit -am "Release 1.0.1" && git tag v1.0.1 && git push origin main --tags
+#
+# Signing: keyless `cosign sign-blob` of the checksums file, via the GitHub
+# Actions OIDC token (Fulcio cert, logged in Rekor). Verify a downloaded release:
+#   cosign verify-blob \
+#     --certificate-identity-regexp '^https://github.com/<owner>/<repo>/\.github/workflows/release\.yml@.*' \
+#     --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+#     --certificate docs-dark-mode_checksums.txt.pem \
+#     --signature  docs-dark-mode_checksums.txt.sig \
+#     docs-dark-mode_checksums.txt
+#   sha256sum -c docs-dark-mode_checksums.txt   # then check the .zip integrity
+#
+# ONE-TIME prerequisite: the extension must already exist in the Web Store (the
+# API can only update an existing item). Upload the first build manually.
+# Required repo SECRETS (Web Store step only): CWS_EXTENSION_ID, CWS_CLIENT_ID,
+# CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN. Cosign needs NO secrets (keyless OIDC).
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: write # create the GitHub Release
+  id-token: write # keyless cosign signing via Sigstore Fulcio
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The tag glob isn't end-anchored, so skip any pre-release tag (e.g. v1.0.0-rc1).
+    if: "!contains(github.ref_name, '-')"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verify the tag matches manifest.json version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          MAN="$(node -p "require('./manifest.json').version")"
+          echo "tag=$TAG  manifest=$MAN"
+          if [ "$TAG" != "$MAN" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match manifest version $MAN. The store rejects re-used versions — bump manifest.json and re-tag."
+            exit 1
+          fi
+
+      - name: Build the package
+        run: bash package.sh
+
+      - name: Generate checksums
+        run: sha256sum docs-dark-mode-v*.zip > docs-dark-mode_checksums.txt
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign the checksums file (keyless)
+        run: |
+          cosign sign-blob --yes \
+            --output-signature docs-dark-mode_checksums.txt.sig \
+            --output-certificate docs-dark-mode_checksums.txt.pem \
+            docs-dark-mode_checksums.txt
+
+      - name: Create GitHub Release with signed artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            docs-dark-mode-v*.zip \
+            docs-dark-mode_checksums.txt \
+            docs-dark-mode_checksums.txt.sig \
+            docs-dark-mode_checksums.txt.pem
+
+      - name: Is the Chrome Web Store configured?
+        id: cws
+        run: echo "configured=${{ secrets.CWS_EXTENSION_ID != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload & publish to the Chrome Web Store
+        if: steps.cws.outputs.configured == 'true'
+        uses: mnao305/chrome-extension-upload@v6.0.0
+        with:
+          file-path: docs-dark-mode-v*.zip
+          glob: true
+          extension-id: ${{ secrets.CWS_EXTENSION_ID }}
+          client-id: ${{ secrets.CWS_CLIENT_ID }}
+          client-secret: ${{ secrets.CWS_CLIENT_SECRET }}
+          refresh-token: ${{ secrets.CWS_REFRESH_TOKEN }}
+          publish: true

@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Dark Mode for Google Docs, Sheets & Slides",
+  "version": "1.0.0",
+  "description": "A comfortable dark theme for Google Docs, Sheets and Slides. Darkens the editor UI (and inverts the page/grid) so you can work at night without eye strain.",
+  "permissions": ["storage"],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Dark Mode for Google Docs",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://docs.google.com/document/*",
+        "https://docs.google.com/spreadsheets/*",
+        "https://docs.google.com/presentation/*"
+      ],
+      "css": ["content/dark.css"],
+      "js": ["content/content.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ]
+}

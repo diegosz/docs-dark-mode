@@ -1,0 +1,109 @@
+name: Selector drift check
+
+# Opens a REAL Google Docs/Sheets editor (no login) and verifies the selectors
+# content/dark.css depends on still exist. Runs one leg per app. On critical
+# drift it opens (or comments on) a per-app GitHub issue with the candidate DOM.
+#
+# Required repo VARIABLES (Settings -> Secrets and variables -> Actions -> Variables):
+#   DOCS_TEST_URL    -> a throwaway DOC          shared "Anyone with the link -> Viewer"
+#   SHEETS_TEST_URL  -> a throwaway SHEET        shared "Anyone with the link -> Viewer"
+#   SLIDES_TEST_URL  -> a throwaway PRESENTATION shared "Anyone with the link -> Viewer"
+# Any may be omitted; that app's leg is skipped. Viewer is enough: the asserted
+# selectors all exist in read-only mode. (The Docs formatting toolbar is edit-only
+# and intentionally not asserted — see tools/selectors.json presence:"variable".)
+# Optional:
+#   AUTO_FIX_ON_DRIFT = "true"  -> @claude-mention the issue so claude.yml opens
+#                                  a fix PR automatically (still needs human merge)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: docs
+            url_var: DOCS_TEST_URL
+          - app: sheets
+            url_var: SHEETS_TEST_URL
+          - app: slides
+            url_var: SLIDES_TEST_URL
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Resolve test URL for this app
+        id: cfg
+        run: echo "url=${{ vars[matrix.url_var] }}" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if no test URL configured
+        if: ${{ steps.cfg.outputs.url == '' }}
+        run: echo "::notice::${{ matrix.url_var }} not set — skipping ${{ matrix.app }} drift check."
+
+      - name: Install Playwright + Chromium
+        if: ${{ steps.cfg.outputs.url != '' }}
+        run: |
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+
+      - name: Run live selector check
+        if: ${{ steps.cfg.outputs.url != '' }}
+        id: check
+        continue-on-error: true
+        env:
+          TEST_URL: ${{ steps.cfg.outputs.url }}
+          DDE_APP: ${{ matrix.app }}
+        run: DDE_TODAY=$(date -u +%F) node tools/check-live-selectors.mjs
+
+      - name: Report drift via GitHub issue
+        if: ${{ steps.cfg.outputs.url != '' && steps.check.outcome == 'failure' && hashFiles('selector-drift-report.json') != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AUTO_FIX: ${{ vars.AUTO_FIX_ON_DRIFT }}
+          APP: ${{ matrix.app }}
+        run: |
+          set -euo pipefail
+          LABEL="selector-drift-${APP}"
+          gh label create "$LABEL" --color B60205 --description "dark.css ${APP} selectors no longer match live Google ${APP}" 2>/dev/null || true
+
+          BODY="$(mktemp)"
+          {
+            echo "An automated live check found Google ${APP} selectors that no longer match any element. Theming for those areas is likely broken until \`content/dark.css\` and \`tools/selectors.json\` are updated."
+            echo
+            echo '```json'
+            cat selector-drift-report.json
+            echo '```'
+            echo
+            echo "**To fix:** replace the missing selectors in \`content/dark.css\` and \`tools/selectors.json\` (bump their \`lastVerified\`) using \`candidateDom\` above to find the new names, then run \`pnpm lint:selectors\`. Tag a new \`v*\` release to publish."
+            if [ "${AUTO_FIX:-}" = "true" ]; then
+              echo
+              echo "@claude please update \`content/dark.css\` and \`tools/selectors.json\` to replace the missing ${APP} selectors above with the correct current Google ${APP} selectors — use the \`candidateDom\` list as the source of truth and do NOT invent selectors it doesn't support. Then run \`pnpm lint:selectors\` and open a pull request."
+            fi
+          } > "$BODY"
+
+          EXISTING="$(gh issue list --label "$LABEL" --state open --json number --jq '.[0].number' || true)"
+          if [ -n "${EXISTING:-}" ] && [ "$EXISTING" != "null" ]; then
+            gh issue comment "$EXISTING" --body-file "$BODY"
+            echo "Commented on existing issue #$EXISTING."
+          else
+            gh issue create --title "Selector drift: ${APP} ($(date -u +%F))" --label "$LABEL" --body-file "$BODY"
+          fi
+
+      - name: Fail the run if drift was detected
+        if: ${{ steps.cfg.outputs.url != '' && steps.check.outcome == 'failure' && hashFiles('selector-drift-report.json') != '' }}
+        run: exit 1

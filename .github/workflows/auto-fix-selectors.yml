@@ -1,0 +1,60 @@
+name: Auto-fix dark-mode selectors
+
+# Manual, targeted selector fix. Paste the broken selectors + the new Google DOM
+# (the `candidateDom` from a drift report) and Claude updates dark.css +
+# selectors.json and opens a PR. Run it from the Actions tab.
+#
+# HONEST LIMIT: Claude cannot see Google's live page. It can only act on the
+# context you give it here — supply the candidateDom / new class names, or it
+# will be guessing. The PR is for human review; never auto-merge.
+#
+# Required secret: ANTHROPIC_API_KEY
+on:
+  workflow_dispatch:
+    inputs:
+      breakage:
+        description: "Broken selectors + new Google DOM (paste candidateDom from selector-drift-report.json)"
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude updates the selectors and opens a PR
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            The dark-mode stylesheet content/dark.css has stopped applying to
+            Google Docs because Google renamed some DOM selectors.
+
+            Breakage context (you MUST rely only on this — you cannot see
+            Google's live page yourself):
+
+            ${{ github.event.inputs.breakage }}
+
+            Tasks:
+            1. Read content/dark.css and tools/selectors.json.
+            2. Replace ONLY the selectors that no longer match with the correct
+               current selectors implied by the context above. Do not invent
+               selectors the context does not support.
+            3. Update tools/selectors.json accordingly and bump the lastVerified
+               date of any changed entries to today.
+            4. Run `node tools/lint-selectors.mjs` and make sure it passes.
+            5. Create a branch (fix/dark-mode-selectors), commit with a clear
+               message, push, and open a pull request against the default branch.
+               In the PR body, list exactly which selectors changed and note that
+               a human must visually verify against live Google Docs.
+          claude_args: |
+            --max-turns 20
+            --allowedTools Edit,Read,Write,Bash
+            --model claude-sonnet-4-6

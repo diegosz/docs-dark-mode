@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build / release artifacts
+*.zip
+*.crx
+*.pem
+*.sig
+docs-dark-mode_checksums.txt
+
+# Tooling output
+selector-drift-report.json
+.pw-profile*/
+
+# Local scratch (probe/verify scripts are throwaway)
+_*.mjs
+screenshot*.png
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
