@@ -1,8 +1,8 @@
-# Privacy Policy — Dark Mode for Google Docs
+# Privacy Policy — Dark Mode for Google Docs, Sheets & Slides
 
 _Last updated: 2026-06-13_
 
-**Dark Mode for Google Docs does not collect, store, transmit, or share any
+**Dark Mode for Google Docs, Sheets & Slides does not collect, store, transmit, or share any
 personal or user data.**
 
 - The extension's only stored data is your preference state — whether dark mode
